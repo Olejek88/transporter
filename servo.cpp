@@ -14,16 +14,10 @@ extern byte  FQ2_OUTPUT;	// Сигнал решения второго датчика FQ (OUTPUT)
 extern byte  XUK1_OUTPUT;	// Сигнал "Решение" датчика XUK1 (OUTPUT)
 extern byte  XUK2_OUTPUT;	// Сигнал "Решение" датчика XUK2 (OUTPUT)
 
-extern byte	 FQ1_ERROR;		// Сигнал датчика нуля
-
 extern byte  DOZA1_START;	// Включить дозатор №1
 extern byte  DOZA2_START;	// Включить дозатор №2
 extern byte  DOZA1_READY;	// Дозатор №1 готов
 extern byte  DOZA2_READY;	// Дозатор №2 готов
-
-extern byte  PRESENT1;		// Наличие детали под дозатором 1
-extern byte  PRESENT2;		// Наличие детали под дозатором 2
-extern byte  ZERO_INST;		// Ноль
 
 extern byte  SERV_ST1;		// пуск сервопривода в обратном направлении
 extern byte  SERV_ST2;		// пуск сервопривода в прямом направлении
@@ -62,7 +56,6 @@ extern	byte	ShapkaFound;// найдена шапка
 byte	prevStekloFound=0;	// найдена стеклодеталь
 byte	prevShapkaFound=0;	// найдена шапка
 
-uint	WAIT_TIME_ETA=12900000;
 
 extern	VOID ULOGW (CHAR* string, ...);				// log file function
 VOID	OutServError (byte iInitSuccess);			// out in console and log SRV error
@@ -98,8 +91,7 @@ VOID ServoConnection (LPVOID lpParam)
  int	pwaitShapka=0;				// доводка шапки до дальнего дозатора
 
  uint	srv_req=0;					// Заданная частота
- uint	wt=0;
-
+ 
  hPort3 = uart_Open("COM6:,115200,E,8,1");
  uart_EnableCheckSum(hPort3, false);
  uart_SetTimeOut(hPort3, 50, CTO_TIMEOUT_ALL);
@@ -110,16 +102,15 @@ VOID ServoConnection (LPVOID lpParam)
 	 pac_GetErrorMessage(pac_GetLastError(), errorBuf);
  	 ULOGW ("[srv] error open COM6 internal port on speed 115200 [8-E-1] [0x%x]: %ls",pac_GetLastError(), errorBuf);
 	}
+ // перед работой останавливаю двигатель
  SERV_ST2=0; SERV_SON=0;
+ // имя устройства
  if (SendData (RECV, adr, (byte *)"02", (byte *)"20", data, 0)) ULOGW ("[srv] обнаружен прибор: [%s]",data);
  
  sprintf ((char*)data,"0000");
  if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
- sprintf ((char*)data,"0000");
- if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]");
  sprintf ((char*)data,"0002");
  if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]");
-
  sprintf ((char*)data,"0000");
  if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
  sprintf ((char*)data,"30000002");
@@ -135,6 +126,8 @@ VOID ServoConnection (LPVOID lpParam)
 
  if (!TestRegim) 
 	{
+	 //sprintf ((char*)data,"0002");
+	 //if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0002] PC"); 
 	 pac_SetBPTimer (2,10000,TimeFunction);
 	}
  else
@@ -142,117 +135,199 @@ VOID ServoConnection (LPVOID lpParam)
 	 PANEL_FREQ=1200; sprintf ((char*)data,"3000%04X",PANEL_FREQ);
 	 if (SendData (SEND, adr, (byte *)"84", (byte *)"06", data,8)) ULOGW ("[srv] запись скорости: %ld",PANEL_FREQ);
 	 if (SendData (RECV, adr, (byte *)"08", (byte *)"06", data,0)) _snprintf (srv_speed_name,19,"%s",data);
-	 sprintf ((char*)data,"0400");				// частота вращения || LAST24.04
+	 sprintf ((char*)data,"03BC");				// частота вращения
 	 SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);		// записи частоты вращения об/мин
+
+	 //sprintf ((char*)data,"0002");
+	 //if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0002] PC"); 
+	 //if (SendData (RECV, adr, (byte *)"08", (byte *)"01", data,0)) _snprintf (srv_acc_name,19,"%s",data);
+	 //if (SendData (RECV, adr, (byte *)"08", (byte *)"02", data,0)) _snprintf (srv_dec_name,19,"%s",data);
+	 //if (SendData (RECV, adr, (byte *)"08", (byte *)"06", data,0)) _snprintf (srv_speed_name,19,"%s",data);
 	 pac_SetBPTimer (2,10000,TimeFunction);
 	}
  sprintf ((char*)data,"CLR ");
  SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
- sprintf ((char*)data,"0400");									// частота вращения  || LAST24.04
+ sprintf ((char*)data,"03BC");				// частота вращения
  SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);		// записи частоты вращения об/мин
- sprintf ((char*)data,"000002E8");								// время/ускорение
+ //ULOGW ("[srv] write start/stop time");
+ sprintf ((char*)data,"000002E8");			// время/ускорение
  SendData (SEND, adr, (byte *)"A0", (byte *)"11", data, 8);		// запись времени/ускорения
 
- if (SendData (RECV, adr, (byte *)"01", (byte *)"80", data2,0))
-	  { value=ConvertDataToValue	(data2, 8); SRV_FACT_PREV=(uint)value; }
+ //ULOGW ("[srv] write path %d (0x%08X)",WAIT_TIME,WAIT_TIME);
+ //sprintf ((char*)data,"%08X",WAIT_TIME);			// путь (количество импульсов)
+ //sprintf ((char*)data,"000047FA");			// путь (количество импульсов)
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"20", data, 8);	// запись пути
 
+ //sprintf ((char*)data,"0001");
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+ //sprintf ((char*)data,"%08X",WAIT_TIME);			// путь (количество импульсов)
+ //SendData (SEND, adr, (byte *)"02", (byte *)"91", data, 8);	// запись пути
+ //sprintf ((char*)data,"%08X",WAIT_TIME);			// путь (количество импульсов)
+ //SendData (SEND, adr, (byte *)"02", (byte *)"90", data, 8);	// запись пути
+ //sprintf ((char*)data,"0001");
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+
+// if (!TestRegim) SERV_SON=1;
  SERV_SON=1; //SERV_ST2=1; // SERV_SP2=1;
 
  // рабочий цикл
  while (WorkEnable)				// пока работаем / внешний цикл
 	{
 	 ConvStopped=0; att=0;
-	 while (WorkEnable)			// пока работаем / разовый проход
+	 while (WorkEnable)		// пока работаем / разовый проход
 		{									
-		 if (PANEL_FREQ<1) PANEL_FREQ=1000;
-		 if (SRV_SPEED<100) SRV_SPEED=1000;
-		 //if (WAIT_TIME<1) WAIT_TIME=196850;
-
-		 if (WAIT_TIME>12500000 && WAIT_TIME<13500000)
-			{
-			 if ((WAIT_TIME+CORRECT)>=0 && (WAIT_TIME+CORRECT)<(WAIT_TIME_ETA+WAIT_TIME_ETA/10)) WAIT_TIME2=(WAIT_TIME+CORRECT)+WAIT_TIME;
-			 else WAIT_TIME2=WAIT_TIME_ETA+(WAIT_TIME+CORRECT);
-			}
-		 else WAIT_TIME2=WAIT_TIME_ETA;
-
-		 if (WAIT_TIME2<520000 || WAIT_TIME2>(WAIT_TIME_ETA+WAIT_TIME_ETA/2)) WAIT_TIME2=WAIT_TIME;
-		 if (CORRECT>0)
-			{
-			 wt=WAIT_TIME2;
-			 if (WAIT_TIME2>WAIT_TIME_ETA) WAIT_TIME2=WAIT_TIME2-(WAIT_TIME2-WAIT_TIME_ETA)/2;
-			 if (WAIT_TIME2<WAIT_TIME_ETA) WAIT_TIME2=WAIT_TIME2+(WAIT_TIME_ETA-WAIT_TIME2)/2;
-			 ULOGW ("[srv] WAIT_TIME2 %d > WAIT_TIME2 %d (%d)",wt,WAIT_TIME2,WAIT_TIME_ETA);
-			}
-		 timer2=200;
-		 
+		 if (PANEL_FREQ<1) PANEL_FREQ=1200;
+		 if (WAIT_TIME<1) WAIT_TIME=196850;
+		 timer2=20;
+			//WAIT_TIME=12898200;		 
+		 //ULOGW ("[mt] in FREQ=%d TIME=%d LSPN=%d SON=%d ST1=%d CYC=%d [REG=%d] | cu FREQ=%d TIME=%d LSP/N=%d|%d SON=%d ST1=%d",PANEL_FREQ,PANEL_TIME,PANEL_LSPN,PANEL_SON,PANEL_ST1,PANEL_CYCLE,PANEL_REGIM,SRV_FREQ_R,SRV_ACCEL,SRV_LSP,SRV_LSN,SRV_SON,SRV_ST1);
 		 sprintf ((char*)data,"0002");
-		 SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4); //ULOGW ("[srv] set regim: positioning [0002]"); 
-		 
-		 sprintf ((char*)data,"0400");				// частота вращения  || LAST24.04 was 258
+		 if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]"); 
+		 //sprintf ((char*)data,"CLR ");
+		 //SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+		 sprintf ((char*)data,"03BC");				// частота вращения
 		 SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);		// записи частоты вращения об/мин
 		 sprintf ((char*)data,"000002E8");			// время/ускорение
 		 SendData (SEND, adr, (byte *)"A0", (byte *)"11", data, 8);		// запись времени/ускорения
 		 SERV_SON=1;
 
-		 ULOGW ("[srv] write path %d (0x%08X)",WAIT_TIME2,WAIT_TIME2);
-		 sprintf ((char*)data,"%08X",WAIT_TIME2);			// путь (количество импульсов)
+		 //sprintf ((char*)data,"GO  ");
+		 //SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+		 //sprintf ((char*)data,"GO  ");
+		 //SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+		 //ULOGW ("[srv] clear indication 1EA5");
+		 //sprintf ((char*)data,"1EA5");
+		 //SendData (SEND, adr, (byte *)"81", (byte *)"00", data, 4);
+		 //sprintf ((char*)data,"0000");
+		 //SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4);
+		 //sprintf ((char*)data,"0101");
+		 //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+
+		 ULOGW ("[srv] write path %d (0x%08X)",WAIT_TIME,WAIT_TIME);
+		 sprintf ((char*)data,"%08X",WAIT_TIME);			// путь (количество импульсов)
 		 SendData (SEND, adr, (byte *)"A0", (byte *)"20", data, 8);	// запись пути
 		 sprintf ((char*)data,"0001");
 		 SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
  
 		 sprintf ((char*)data,"00000007");			// включаем SON, LSP, LSN
 		 SendData (SEND, adr, (byte *)"92", (byte *)"00", data, 8);	// для готовности сервоусилителя
+		 Sleep (100);	// 100
+		 ULOGW ("[srv] start positioning");
 		 sprintf ((char*)data,"1EA5");				// запуск позиционирования
 		 SendData (SEND, adr, (byte *)"A0", (byte *)"40", data, 4);	// запуск	 
 
-		 CORRECT=0;
+		 //sprintf ((char*)data,"GO  ");
+		 //SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+		 //SERV_SON=1;
+		 Sleep (300);	// 300
 		 ReadRegisters (adr);
+		 //SRV_ST2
+		 //!SRV_INP
 		 while (!SRV_INP && timer2)
 			{
-			 if (ZERO_INST1)
-				{
-				 frst=1; sensor_pos=0;
-				 if (SendData (RECV, adr, (byte *)"01", (byte *)"80", data2,0))
-				  { value=ConvertDataToValue	(data2, 8); SRV_FACT=(uint)value; }
-
-				 if (frst2 && ((SRV_FACT_PREV-SRV_FACT)/5)<(WAIT_TIME_ETA+WAIT_TIME_ETA/50) && ((SRV_FACT_PREV-SRV_FACT)/5)>(WAIT_TIME_ETA-WAIT_TIME_ETA/50)) 
-					{
-					 WAIT_TIME=(SRV_FACT_PREV-SRV_FACT)/5;
-					 ULOGW ("[srv] SRV_FACT_PREV=%d SRV_FACT=%d SRV_2P=%d WAIT[%d] CORRECT[%d] WAIT2[%d]",SRV_FACT_PREV,SRV_FACT,SRV_2P,WAIT_TIME,CORRECT,WAIT_TIME2);
-					}
-				 SRV_FACT_PREV=SRV_FACT;
-				 Sleep (100);
-
-				 ReadRegisters (adr);
-				 ZERO_INST1=0;
-				}
+			 //SERV_ST2=0;
 			 ReadRegisters (adr);
-			 //ULOGW ("[srv] SRV_INP=%d speed:%f | freq=%f | ras=%d | imp=%d | rass2=%d",SRV_INP,SRV_SPEED,SRV_FREQ_R,posit,rass,rass2);
-			 timer2--;
-			}
+			 //sprintf ((char*)data,"CLR ");
+			 //SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
 
-		 if (WAIT_TIME2>WAIT_TIME_ETA/2) { FQ1_OUTPUT=1; FQ2_OUTPUT=1; }
+			 if (SendData (RECV, adr, (byte *)"01", (byte *)"81", data2, 0))
+				{
+				 value=ConvertDataToValue	(data2, 8);
+				 if (value>=0) SRV_SPEED=value; else SRV_SPEED=(-1)*value;
+				 SRV_SPEED=ConvertDataToValue	(data2, 8);
+				 //ULOGW ("[srv] engine RPM: %s [%s] %f","SRV_SPEED",data2,SRV_SPEED);
+				}
+			 if (SendData (RECV, adr, (byte *)"01", (byte *)"84", data2,0))
+				{
+				 value=ConvertDataToValue	(data2, 8);
+				 if (value>=0) SRV_FREQ_R=(uint)value; else SRV_FREQ_R=(uint)((-1)*value);
+				 if (SRV_FREQ_R<0) SRV_FREQ_R*=(-1);
+		 		 //ULOGW ("[srv] requested FREQ: %s [%s] %ld","SRV_FREQ_R",data2,SRV_FREQ_R);
+				}
+			 if (SendData (RECV, adr, (byte *)"01", (byte *)"82", data2,0))
+				{
+				 value=ConvertDataToValue	(data2, 8);
+				 if (value>=0) posit=(uint)value; else posit=(uint)((-1)*value);
+				}
+			 if (SendData (RECV, adr, (byte *)"01", (byte *)"83", data2,0))
+				{		
+				 value=ConvertDataToValue	(data2, 8);
+				 rass=(uint)value;
+				}
+			 if (SendData (RECV, adr, (byte *)"02", (byte *)"91", data2,0))
+				{
+				 value=ConvertDataToValue	(data2, 8);
+				 rass2=(uint)value;
+				}			 
+			 //ULOGW ("[srv] SRV_INP=%d speed:%f | freq=%f | ras=%d | imp=%d | rass2=%d",SRV_INP,SRV_SPEED,SRV_FREQ_R,posit,rass,rass2);
+			 /*
+			 if (PANEL_FREQ!=SRV_FREQ_R && PANEL_FREQ>0 && PANEL_FREQ<3000)
+		 		{
+		 		 sprintf ((char*)data,"3000%04X",PANEL_FREQ);
+		 		 if (SendData (SEND, adr, (byte *)"84", (byte *)"06", data,8)) ULOGW ("[srv] ser frequency: %ld об/мин",PANEL_FREQ);
+		 		}*/
+			 if (ST_ZERO)
+				{
+				 SERV_SON=0; SERV_ST2=0;
+				 sprintf ((char*)data,"CLR ");
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+				 sprintf ((char*)data,"000C");				// частота вращения
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);		// записи частоты вращения об/мин
+				 ULOGW ("[srv] write start/stop time");
+				 sprintf ((char*)data,"00000028");			// время/ускорение
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"11", data, 8);		// запись времени/ускорения
+				 sprintf ((char*)data,"0000");
+				 if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: speed control [0001]"); 
+				 sprintf ((char*)data,"0002");
+				 if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0002] PC"); 
+				 sprintf ((char*)data,"30000010");
+		 		 if (SendData (SEND, adr, (byte *)"84", (byte *)"06", data,8)) ULOGW ("[srv] ser frequency: %ld об/мин",10);
+				 SERV_SON=1;
+				 while (ST_ZERO && WorkEnable)
+					{					 
+					 if (ST_FWD) SERV_ST2=1;
+					 else SERV_ST2=0;
+					 Sleep (10);
+					}
+				 sprintf ((char*)data,"0000");
+				 if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
+				 sprintf ((char*)data,"0002");
+				 if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]"); 
+				 //sprintf ((char*)data,"0000");
+				 //if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
+				 //sprintf ((char*)data,"30000002");
+				 //if (SendData (SEND, adr, (byte *)"84", (byte *)"01", data, 8)) ULOGW ("[srv] запись режима: 0002");
+				 //sprintf ((char*)data,"0002");
+				 //if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0002] PC"); 
+				 sprintf ((char*)data,"CLR ");
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
+				 sprintf ((char*)data,"03BC");				// частота вращения
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);		// записи частоты вращения об/мин
+				 ULOGW ("[srv] write start/stop time");
+				 sprintf ((char*)data,"000002E8");			// время/ускорение
+				 //	 WAIT_TIME=196500;
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"11", data, 8);		// запись времени/ускорения
+				 ULOGW ("[srv] write path %d (0x%08X)",WAIT_TIME,WAIT_TIME);
+				 sprintf ((char*)data,"%08X",WAIT_TIME);			// путь (количество импульсов)
+				 SendData (SEND, adr, (byte *)"A0", (byte *)"20", data, 8);	// запись пути
+				 //sprintf ((char*)data,"0101");
+				 //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+				 //sprintf ((char*)data,"0001");
+				 //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+				 SERV_SON=1;
+				 break;
+				}
+			 timer2--;
+			 ULOGW ("[srv] timer %d",timer2);
+			 Sleep (5);
+			}
+		 //sprintf ((char*)data,"0000");
+		 //if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]"); 
+		 ULOGW ("[srv] SRV_INP=%d speed:%f | freq=%f | ras=%d | imp=%d | rass2=%d",SRV_INP,SRV_SPEED,SRV_FREQ_R,posit,rass,rass2);
+		 FQ1_OUTPUT=1; FQ2_OUTPUT=1;
 
 		 // сервопривод дошел до позиции
-		 if (SRV_INP) 
-			{ 
-			 //ULOGW ("[srv] servo in position - stop"); 
-			 if (SendData (RECV, adr, (byte *)"01", (byte *)"80", data2,0))
-				  { value=ConvertDataToValue	(data2, 8); SRV_2P=(uint)value; }
-			 if (frst) 
-				{
-				 sensor_pos=0;
-				 //WAIT_TIME2=(SRV_FACT_PREV-2*SRV_FACT+(SRV_2P))/5;
-				 //WAIT_TIME2=(-837+2*901-913)/5;
-				 //CORRECT=-901581952+913070400-5154344; // 7000000
-				 if (SRV_2P<SRV_FACT && frst2) CORRECT=SRV_2P-SRV_FACT-(4954344); // LAST24.04 (4954344)
-				 ULOGW ("[srv] SRV_FACT_PREV=%d SRV_FACT=%d SRV_2P=%d WAIT_TIME[%d] CORRECT[%d] WAIT_TIME2[%d]",SRV_FACT_PREV,SRV_FACT,SRV_2P,WAIT_TIME,CORRECT,WAIT_TIME2);
-				 SRV_FACT_PREV=SRV_FACT;
-				 frst=0; frst2=1;
-				}			 
-			 else sensor_pos++;
-			 break; 
-			}
+		 if (SRV_INP) { ULOGW ("[srv] servo in position - stop"); break; }
 		 // пока нет срабатывания датчика ИК
 		 if (XUK1_OUTPUT) { ULOGW ("[srv] сработал датчик ИК, останов конвейера");  break; }
 		 if (XUK2_OUTPUT) { ULOGW ("[srv] сработал датчик ИК, останов конвейера");  break; }
@@ -281,34 +356,33 @@ VOID ServoConnection (LPVOID lpParam)
 			}
 		 SERV_ST2=1; //SERV_SON=1;
 		}
-
- 	  // сработал датчик установки нуля
-	  if (ZERO_INST && 0)
-		{
-		 ULOGW ("[srv] conveer stopped [ZERO]");
-		 SERV_ST2=0; SERV_SON=0;
-		 sprintf ((char*)data,"0000");
-		 if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
-		 sprintf ((char*)data,"0002");
-		 if (SendData (SEND, adr, (byte *)"8B", (byte *)"00", data, 4)) ULOGW ("[srv] set regim: positioning [0002]"); 
-
-		 sprintf ((char*)data,"CLR ");
-		 SendData (SEND, adr, (byte *)"A0", (byte *)"41", data, 4);
-		 ConvStopped=1;
-		}
-
-	  // обнаружил образец1 или образец2
+ 	  // обнаружил образец1 или образец2
 	  //if (StekloFound || ShapkaFound)
 	  if (FQ1_OUTPUT || FQ2_OUTPUT)
 		{
+		 /*att=0; 
+		 while (SRV_ST2 && WorkEnable)
+			{
+			 //SERV_ST2=0;
+			 ReadRegisters (adr);
+			 Sleep (5); att++;
+			}
+		 ULOGW ("[srv] attempt [%d] for conveer stopped (SRV_ST2=%d)",att,SRV_ST2);
+		 */
+		 //if (1)
 		 if (!SRV_ST2)
 			{
-			 //ULOGW ("[srv] conveer stopped [Dz1=%d Dz2=%d]",Dozation1,Dozation2);
+			 ULOGW ("[srv] conveer stopped [Dz1=%d Dz2=%d]",Dozation1,Dozation2);
 			 ConvStopped=1; 
-			 ULOGW ("[srv] conveer stopped | waiting for dozation [%d]ms [Dz1=%d Dz2=%d]",(20-att)*100,Dozation1,Dozation2);
+			 ULOGW ("[srv] waiting for dozation [%d]ms [Dz1=%d Dz2=%d]",(20-att)*100,Dozation1,Dozation2);
 			 Sleep (700);
+			 /*att=20;
+			 while ((Dozation1 || Dozation2) && att)
+				{
+				 Sleep (100); att--;
+				}*/
 			 att=140;
-			 while (WorkEnable && (Dozation1 || Dozation2) && att)
+			 while (WorkEnable && (Dozation1 && Dozation2) && att)
 				{
 				 // читаем все входные/выходные сигналы
 				 ReadRegisters (adr);
@@ -316,11 +390,6 @@ VOID ServoConnection (LPVOID lpParam)
 				}
 			 ULOGW ("[srv] dozation finished, conveer started [Dz1=%d Dz2=%d]",Dozation1,Dozation2);
 			 ConvStopped=0; //SERV_ST2=1; 
-			 while (WorkEnable && PANEL_STOP) 
-				{
-				 //ULOGW ("[srv] temporary stop");
-				 Sleep (2000);
-				}
 
 			 // читаем все входные/выходные сигналы
 			 //ReadRegisters (adr);
@@ -340,8 +409,9 @@ byte SendData (int type, int adr, byte* func, byte* ndata, byte* data, byte nbyt
  char out[100],in[100];
  byte crc[4];
  byte count=3;
- DWORD bytes=0,att=0;
+ DWORD bytes=0;
  bool	res=FALSE;
+ //char	outs[50];
  //ULOGW ("[srv] SendData (%d, %d, %s, %s, %s, %d)",type, adr, func, ndata, data, nbytes);
 
  out[0]=SOH;
@@ -381,12 +451,7 @@ byte SendData (int type, int adr, byte* func, byte* ndata, byte* data, byte nbyt
 		 count--;
 		 continue;
 		}	 
-	 //if (ZERO_INST1) return 0;
-
-	 //while (!ZERO_INST1 && att<10) { Sleep (5); att++; }
-	 //if (ZERO_INST1) return 0;
-	 Sleep (40);
-
+	 Sleep (50);
 	 bytes=uart_GetDataSize(hPort3,IN_DATA);
  	 //ULOGW ("[SRV] recieve %d bytes",bytes);
 
@@ -445,9 +510,7 @@ VOID ReadRegisters (int	adr)
 {
  byte	dat[100];
  uint	data;
-
  // чтение входных сигналов
- if (0)
  if (SendData (RECV, adr, (byte *)"12", (byte *)"00", dat, 4))
 	{
 	 data=ConvertHexValue(dat, 8);
@@ -532,12 +595,14 @@ float	ConvertDataToValue	(byte* data, byte len)
 
 	 if (data[3]=='0')	{ val+=ch*k;  k/=0x10;  }
 	 if (data[3]=='1')	{ val+=ch*k2; k2/=10;	}
+	 //ULOGW ("[SRV] 3=(%c) 4=(%c) [%x] val=%ld k=0x%x",data[3],data[4+i],ch,val,k);
 	}
  if (data[2]>='0' && data[2]<'7') 
 	{ 
 	 value=(float)val/(float)(pow (10,data[2]-0x30)); 
 	}
- else value=(float)val; //ULOGW ("[srv] %f",value);
+ else value=(float)val;
+ //ULOGW ("[srv] %f",value);
  return value;
 }
 //----------------------------------------------------------------------------------------------------
@@ -545,6 +610,7 @@ int	CALLBACK TimeFunction (void)
 {
  timer1--;
  //ULOGW ("[srv] timer [%d]",timer1);
+ //if (PANEL_REGIM && TestRegim)
  if (PANEL_REGIM)
 	{
 	 if (timer1<=0) 
@@ -585,9 +651,39 @@ uint	ConvertHexValue	(byte* data, byte len)
 
 	 val+=ch*k;
 	 k/=0x10;
+	 //ULOGW ("[SRV] [%x] val=%ld k=0x%x",ch,val,k);
 	}
  value=val;
+ //ULOGW ("[srv] %d",value);
  return value;
 }
 //---------------------------------------------------------------------------------------------------- 
- 
+ // позиционирование
+ //ULOGW ("[SRV] запись пути (количество импульсов) - 400000 импульсов");
+ //sprintf ((char*)data,"00AA1A80");			// путь (количество импульсов)
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"20", data, 8);	// запись пути
+ //ULOGW ("[SRV] выбор направления вращения - прямое");
+ //sprintf ((char*)data,"0000");				// прямое вращение
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);	// выбор направления вращения
+ //ULOGW ("[SRV] запуск позиционирования");
+ //sprintf ((char*)data,"1EA5");				// запуск позиционирования
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"40", data, 4);	// запуск
+
+	 //ULOGW ("[srv] запись частоты вращения 200 об/мин");
+	 //sprintf ((char*)data,"00C8");								// частота вращения
+	 //SendData (SEND, adr, (byte *)"A0", (byte *)"10", data, 4);	// записи частоты вращения об/мин
+	 //ULOGW ("[srv] запись времени/ускорения 1 секунда");
+	 //sprintf ((char*)data,"000003E8");							// время/ускорение
+	 //SendData (SEND, adr, (byte *)"A0", (byte *)"11", data, 8);	// запись времени/ускорения
+	 //ULOGW ("[srv] включаем SON, LSP, LSN для готовности сервоусилителя");
+	 //sprintf ((char*)data,"00000007");							// включаем SON, LSP, LSN
+	 //SendData (SEND, adr, (byte *)"92", (byte *)"00", data, 8);	// для готовности сервоусилителя
+
+ //ULOGW ("[srv] направление вращения");
+ //sprintf ((char*)data,"0000");
+ //if (SendData (SEND, adr, (byte *)"85", (byte *)"00", data, 4)) ULOGW ("[srv] выбор группы параметров [0000] PA"); 
+ //ULOGW ("[srv] направление вращения прямое");
+ //sprintf ((char*)data,"0000");
+ //SendData (SEND, adr, (byte *)"A0", (byte *)"21", data, 4);
+ //sprintf ((char*)data,"00000000");
+ //if (SendData (SEND, adr, (byte *)"84", (byte *)"0E", data,8)) ULOGW ("[srv] направление вращения прямое");

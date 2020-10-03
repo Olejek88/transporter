@@ -71,27 +71,15 @@
 
 //--------------------------------------------------------------------------------------------------------
 byte	SRV_REGIM=0;	// Текущий режим сервопривода
-
-uint	SRV_FACT=0;			// Фактическое положение [80]
-uint	SRV_FACT_PREV=0;	// Фактическое положение [80]
-uint	SRV_2P=0;			// Фактическое положение [80]
-
-uint	SRV_FREQ=0;		// Частота вращения [81]
-uint	SRV_RASS=0;		// Рассогласование [82]
-uint	SRV_IMPZAD=0;	// Импульсное задание [83]
-uint	SRV_POS=0;		// Абсолютное положение [8B]
-uint	SRV_COUNT=0;	// Абсолютный счетчик [8C]
-
-uint	SRV_ABSPOS=0;	// Абсолютное положение [90]
-uint	SRV_POIMP=0;	// Абсолютный счетчик [91]
-
+uint	SRV_FACT=0;		// Фактическое положение 
+uint	SRV_FREQ=0;		// Частота вращения
+uint	SRV_COUNT=0;	// Абсолютный счетчик
+uint	SRV_RASS=0;		// Рассогласование
 float	SRV_MOMENT=0;	// Текущий момент
 uint	SRV_FREQ_R=0;	// Заданная частота
+uint	SRV_POS=0;		// Абсолютное положение
 float	SRV_SPEED=0;	// Задание скорости
 uint	SRV_ACCEL=0;	// время разгона
-
-uint	CORRECT=0;
-uint	WAIT_TIME2=0;
 
 uint	posit=0;
 uint	rass=0;
@@ -140,10 +128,3 @@ byte	SRV_BWNG=0;		// Предупреждение о батарее
 byte	SRV_CDPS=0;		// Сигнал CDPS
 byte	SRV_ABSV=0;		// Если данные по абсолютным координатам стерт
 
-extern	byte  ZERO_INST1;	// Ноль
-byte	frst=0;				// первый стоп после сенсора
-byte	frst2=0;			// первый круг
-extern	byte	IZnal[50];	// наличие изоляторов на позиции
-byte	sensor_pos=0;		// позиция сенсора
-
-extern	byte	PANEL_STOP;

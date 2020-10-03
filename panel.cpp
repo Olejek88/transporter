@@ -57,7 +57,11 @@ VOID PanelConnection (LPVOID lpParam)
 
  while (WorkEnable)
 	{
+	 //int iInitSuccess = MBRTUInit(port,speed,1,8,1,100);
+	 //if (!iInitSuccess) ULOGW ("[mt] initialize modbus driver on port [COM%d:115200:Even:8bit:1sb] for [panel] success",port);
+	 //else OutModbusError (iInitSuccess);
 	 Sleep (1000);
+
 	 if (TestRegim)
 		{
 		 if (!MBRTU_R_Registers(port,adr,50+1,1,&in_reg,0x3)) { PANEL_FREQ=(uint)in_reg; ULOGW ("[mt] read frequency from panel [%d]",PANEL_FREQ); }
@@ -66,6 +70,12 @@ VOID PanelConnection (LPVOID lpParam)
 		 if (!MBRTU_R_Registers(port,adr,56+1,1,&in_reg,0x3)) { PANEL_TYPE=(uint)in_reg; ULOGW ("[mt] read type from panel [%d]",PANEL_TYPE); }
 
 		 if (!MBRTU_R_Coils(port,adr,50+1,5,&PANEL_LSPN,0x1)) ULOGW ("[mt] read current LSP/LSN from panel [%d]",PANEL_LSPN);
+
+		 //if (!MBRTU_W_Coil(port,adr,50+1,SRV_LSP)) ULOGW ("[mt] write current LSP [%d]",SRV_LSP);
+ 		 //if (!MBRTU_W_Coil(port,adr,51+1,SRV_SON)) ULOGW ("[mt] write current SON [%d]",SRV_SON);
+		 //if (!MBRTU_W_Coil(port,adr,52+1,SRV_ST1)) ULOGW ("[mt] write current ST1 [%d]",SRV_ST1);
+ 		 //if (!MBRTU_W_Register(port,adr,50+1,SRV_ACCEL)) ULOGW ("[mt] write current SRV_ACCEL [%d]",SRV_ACCEL);
+		 //if (!MBRTU_W_Register(port,adr,52+1,SRV_FREQ)) ULOGW ("[mt] write current SRV_FREQ [%d]",SRV_FREQ);
 		}
 
 	 if (!MBRTU_R_Registers(port,adr,50+1,1,&in_reg,0x3)) { PANEL_FREQ=(uint)in_reg; /*ULOGW ("[mt] read frequency from panel [%d]",PANEL_FREQ); */ }
@@ -76,9 +86,10 @@ VOID PanelConnection (LPVOID lpParam)
 	 if (!MBRTU_R_Registers(port,adr,66+1,1,&in_reg,0x3)) { DOZE2_TIME=(uint)in_reg; /* ULOGW ("[mt] read type from panel [%d]",PANEL_TYPE); */}
 	 if (!MBRTU_R_Registers(port,adr,68+1,1,&in_reg,0x3)) { DOZE1_TIME2=(uint)in_reg; /* ULOGW ("[mt] read type from panel [%d]",PANEL_TYPE); */}
 	 if (!MBRTU_R_Registers(port,adr,70+1,1,&in_reg,0x3)) { DOZE2_TIME2=(uint)in_reg; /* ULOGW ("[mt] read type from panel [%d]",PANEL_TYPE); */}
+	 if (!MBRTU_R_Registers(port,adr,222+1,1,&in_reg,0x3)) { WAIT_TIME=(uint)in_reg*10; /* ULOGW ("[mt] read type from panel [%d]",PANEL_TYPE); */}
 
 	 // read all coils - commands from panel
-	 MBRTU_R_Coils(port,adr,53+1,3,&PANEL_REGIM,0x1);
+	 MBRTU_R_Coils(port,adr,50+1,5,&PANEL_LSPN,0x1);
 	 MBRTU_R_Coils(port,adr,155+1,2,&ST_ZERO,0x1);
 	 
 	 // send all values to panel	 	
@@ -93,34 +104,19 @@ VOID PanelConnection (LPVOID lpParam)
  	 memcpy (data+32,&SRV_SPEED,sizeof(SRV_SPEED));				// 414
 	 MBRTU_W_Multi_Registers(port,adr,400+1,20,(short *)data);
 
-	 memcpy (data,&SRV_REGIM,sizeof(SRV_REGIM));				// 400 
-	 memcpy (data+4,&SRV_FACT,sizeof(SRV_FACT));				// 402
- 	 memcpy (data+8,&SRV_FREQ,sizeof(SRV_FREQ));				// 404	
- 	 memcpy (data+12,&SRV_COUNT,sizeof(SRV_COUNT));				// 406
-	 MBRTU_W_Multi_Registers(port,adr,400+1,20,(short *)data);
+	 MBRTU_W_Multi_Coils(port,adr,78+1,9,data);
 
-	 memcpy (data, &IZnal, 50);
-	 if (PANEL_REGIM)
-		{
-		 data[50]=DOZA2_START; data[51]=0;
-		 data[52]=DOZA1_START; data[53]=0;
-		}
-	 else
-		{
-		 data[50]=0; data[51]=DOZA2_START; 
-		 data[52]=0; data[53]=DOZA1_START;
-		}
-	 iReadSuccess =MBRTU_W_Multi_Coils(port,adr,800+1,54,data);
-
-	 memcpy (data, &sensor_pos, 1);							// 860
-	 memcpy (data+4,&SRV_FACT,sizeof(SRV_FACT));			// 862
- 	 memcpy (data+8,&SRV_FACT_PREV,sizeof(SRV_FACT_PREV));	// 864	
- 	 memcpy (data+12,&SRV_2P,sizeof(SRV_2P));				// 866
- 	 memcpy (data+16,&CORRECT,sizeof(CORRECT));				// 868
- 	 memcpy (data+20,&WAIT_TIME,sizeof(WAIT_TIME));			// 870
- 	 memcpy (data+24,&WAIT_TIME2,sizeof(WAIT_TIME2));		// 872
-
-	 MBRTU_W_Multi_Registers(port,adr,860+1,14,(short *)data);
+	 //memcpy (data, &SRV_SON, 18);
+	 //MBRTU_W_Multi_Coils(port,adr,400+1,18,data);
+	 //if (!MBRTU_W_Multi_Coils(port,adr,400+1,18,data)) ULOGW ("[mt] write current SON-CDP [%d]",SRV_SON);
+	 //memcpy (data, &SRV_RD, 18);
+	 //MBRTU_W_Multi_Coils(port,adr,420+1,18,data);
+	 //if (!MBRTU_W_Multi_Coils(port,adr,420+1,18,data)) ULOGW ("[mt] write current RD-ABSV [%d]",SRV_RD);
+	 
+	 //memcpy (data, &FQ1_ERROR, 10);
+	 //MBRTU_W_Multi_Coils(port,adr,10+1,10,data);
+	 //if (!MBRTU_W_Multi_Coils(port,adr,10+1,10,data)) ULOGW ("[mt] write DO (FQ1_ERROR): [%d %d %d %d %d %d %d %d %d %d]",data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);
+	 //else ULOGW ("[mt] write DO (FQ1_ERROR) signals failed");
 
 	 memcpy (data, &FQ1_ERROR, sizeof(FQ1_ERROR));
 	 memcpy (data+2, &FQ1_BUSY, sizeof(FQ1_BUSY));
@@ -142,6 +138,9 @@ VOID PanelConnection (LPVOID lpParam)
 	 iReadSuccess =MBRTU_W_Multi_Coils(port,adr,110+1,8,data+7);
 	 iReadSuccess =MBRTU_W_Multi_Coils(port,adr,120+1,8,data+14);
 
+	 //if (!iReadSuccess) ULOGW ("[mt] write DO[100/110/120]: [%d %d %d %d %d %d %d] [%d %d %d %d %d %d %d] [%d %d %d %d %d %d %d]",data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10],data[11],data[12],data[13],data[14],data[15],data[16],data[17],data[18],data[19],data[20]);
+	 //else ULOGW ("[mt] write all DO [100/110/120] signals failed error code: %d",iReadSuccess);
+
  	 if (count%10==0)
 		{
 		 memcpy (data,&VC_LG,sizeof(VC_LG));
@@ -156,7 +155,22 @@ VOID PanelConnection (LPVOID lpParam)
  		 memcpy (data+8,&MOD1_2,sizeof(MOD1_2));
  		 memcpy (data+12,&MOD1_3,sizeof(MOD1_3));
 		 iReadSuccess =MBRTU_W_Multi_Registers(port,adr,101,8,(short *)data);
-		}	 
+		 //if (!iReadSuccess) ULOGW ("[mt] write all AI signals success [AI: %f %f %f %f]",MO1_LG,MOD1_1,MOD1_2,MOD1_3);
+		 //else ULOGW ("[mt] write all AI signals failed error code: %d",iReadSuccess);
+		}
+
+ 	 //iReadSuccess =MBRTU_R_Registers(port,adr,200,1,&currentregim,0x3);
+	 //if (!iReadSuccess) ULOGW ("[MT] read current scene/regim [%d]",currentregim);
+	 //else ULOGW ("[MT] read current scene/regim failed: %d",iReadSuccess);
+	 
+	 //memcpy (data,&allAO,sizeof(allAO));
+	 //result=ModbusRTU_Write(adr, 0, 8, 16, data, PresetMultiRegister);
+ 	 //memcpy (data,&allAI,sizeof(allAI));
+	 //result=ModbusRTU_Write(adr, 0, 8, 16, data, PresetMultiRegister);
+	 //result=ModbusRTU_Read(adr, 0, 1, data, ReadInputRegisters);
+	 //result=ModbusRTU_Write(adr, 0, sizeof(allDI), sizeof(allDI), allDI, PresetMultiRegister);
+	 //result=ModbusRTU_Write(adr, 0, sizeof(allDO), sizeof(allDO), allDO, PresetMultiRegister);
+	 
 	 count++;	 
 	}
  MBRTUClose(port);
@@ -341,8 +355,12 @@ UINT CRC (const BYTE* const Data, const BYTE DataSize)
  BYTE* _Data = (BYTE*)Data;
  for(unsigned int i = 0; i < DataSize; i++) 
     {
+     //ULOGW ("!%d [0x%x] > [%x]",i,*_Data,(UINT)_CRC);
      _CRC = CalcCRC(*_Data, _CRC);
+	 //_CRC = crc16 (*_Data);
+
      _Data++;
+     //ULOGW ("@%d [0x%x] > [%u]",i,*_Data,(UINT)_CRC);
     }
 
  return _CRC;
@@ -431,3 +449,21 @@ VOID ReadCOM (LPVOID lpParam)
 	 else ULOGW ("[MT] RECV (0x%x) (0x%x) (0x%x 0x%x) (0x%x 0x%x) (0x%x 0x%x) [0x%x 0x%x]",iRecv[0],iRecv[1],iRecv[2],iRecv[3],iRecv[4],iRecv[5],iRecv[6],iRecv[7],iRecv[8],iRecv[9]);
 	}
 }
+//------------------------------------------------------------------------------------------------------------------
+// old shit
+
+//unsigned short _CRC16 (unsigned char *puchMsg, unsigned short usDataLen);
+
+/* hPort2 = uart_Open("COM3,speed,E,8,1");
+ uart_SetTimeOut(hPort2, 500, CTO_TIMEOUT_ALL);
+ if (hPort2) ULOGW ("initialize modbus driver on port [COM%d:%d:Even:8bit:1sb] for [Panel] success",port,speed);
+ else
+	{
+	 ULOGW ("error open COM3 internal port on speed %d [8-E-1]",speed);
+	 pac_GetErrorMessage(pac_GetLastError(), errorBuf);
+	 ULOGW ("error [0x%x]: %s",pac_GetLastError(), errorBuf);	 
+	}*/
+
+//result=ModbusRTU_Read(adr, 0, 10, data, ReadHoldingRegisters);
+//result=ModbusRTU_Write(adr, 0, 1, 2, data, PresetSingleRegister);
+//iReadSuccess =MBRTU_W_Multi_Coils(port,adr,1,1,allDI);
