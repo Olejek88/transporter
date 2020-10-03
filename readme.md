@@ -1,0 +1,1 @@
+The system is based on WinPAC-8000 and is designed to control the conveyor servo drive. In automatic mode, the system allows for automatic dosage of solution for assembling insulators (C, Windows CE) [http://www.aiz.ru/]
